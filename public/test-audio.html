@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html>
+<head><title>Audio Test</title></head>
+<body>
+<h2>Audio File Test</h2>
+<div id="results"></div>
+<h3>Kiwi (OGG):</h3>
+<audio controls src="/src/assets/kiwi.ogg"></audio>
+<h3>Papa (OGG):</h3>
+<audio controls src="/src/assets/papa.ogg"></audio>
+<h3>Mummy (OGG):</h3>
+<audio controls src="/src/assets/mummy.ogg"></audio>
+
+<h3>Kiwi as base64 data URL:</h3>
+<div id="kiwi-b64"></div>
+
+<script>
+async function testFile(url, name) {
+    const res = document.getElementById('results');
+    try {
+        const response = await fetch(url);
+        const contentType = response.headers.get('content-type');
+        const blob = await response.blob();
+        const arrayBuffer = await blob.arrayBuffer();
+        
+        res.innerHTML += `<p><b>${name}</b>: ${blob.size} bytes, type: ${contentType}, blob type: ${blob.type}</p>`;
+        
+        // Try to decode with Web Audio API
+        const audioCtx = new AudioContext();
+        try {
+            const audioBuffer = await audioCtx.decodeAudioData(arrayBuffer.slice(0));
+            res.innerHTML += `<p style="color:green">  ✅ Decoded! Duration: ${audioBuffer.duration.toFixed(2)}s, Channels: ${audioBuffer.numberOfChannels}, SampleRate: ${audioBuffer.sampleRate}</p>`;
+            
+            // Check if audio data is actually silent
+            const channelData = audioBuffer.getChannelData(0);
+            let maxSample = 0;
+            let sumSamples = 0;
+            for (let i = 0; i < channelData.length; i++) {
+                const abs = Math.abs(channelData[i]);
+                if (abs > maxSample) maxSample = abs;
+                sumSamples += abs;
+            }
+            const avgSample = sumSamples / channelData.length;
+            res.innerHTML += `<p>  Peak amplitude: ${maxSample.toFixed(6)}, Avg amplitude: ${avgSample.toFixed(6)}, Samples: ${channelData.length}</p>`;
+            
+            if (maxSample < 0.001) {
+                res.innerHTML += `<p style="color:red">  ⚠️ FILE IS SILENT! Max sample is near zero.</p>`;
+            } else {
+                res.innerHTML += `<p style="color:green">  ✅ File has actual audio content.</p>`;
+            }
+        } catch (decodeErr) {
+            res.innerHTML += `<p style="color:red">  ❌ Decode failed: ${decodeErr.message}</p>`;
+        }
+        audioCtx.close();
+    } catch (err) {
+        res.innerHTML += `<p style="color:red"><b>${name}</b>: Error - ${err.message}</p>`;
+    }
+}
+
+async function main() {
+    await testFile('/src/assets/kiwi.ogg', 'Kiwi');
+    await testFile('/src/assets/papa.ogg', 'Papa');
+    await testFile('/src/assets/mummy.ogg', 'Mummy');
+}
+
+main();
+</script>
+</body>
+</html>
